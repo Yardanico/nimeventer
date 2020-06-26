@@ -1,0 +1,12 @@
+{
+  "base_url": "https://forum.nim-lang.org/",
+  "threads_url": "https://forum.nim-lang.org/threads.json",
+  "posts_url": "https://forum.nim-lang.org/posts.json?id=",
+  "max_context_len": 60,
+  "check_interval": 20,
+  "irc_nickname": "ForumUpdaterBot",
+  "irc_password": "XXXXXXXXX",
+  "irc_chan": "#nim",
+  "discord_webhook": "XXXXXXXXXXX",
+  "telegram_url": "XXXXXXXXX"
+}
