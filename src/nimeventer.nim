@@ -30,7 +30,10 @@ type
     check_interval: int
     irc_nickname: string
     irc_password: string
-    irc_chan: string
+    irc_chans: seq[string]
+    irc_full_chans: seq[string]
+    telegram_ids: seq[string]
+    telegram_full_ids: seq[string]
     discord_webhook: string
     telegram_url: string
 
@@ -48,8 +51,8 @@ proc postToDiscord(webhook, content: string) {.async.} =
   let resp = await client.post(webhook, data)
   client.close()
 
-proc postToTelegram(content: string) {.async.} = 
-  let chan = "@nim_lang".encodeUrl()
+proc postToTelegram(id, content: string) {.async.} = 
+  let chan = id.encodeUrl()
   let client = newAsyncHttpClient()
   let resp = await client.get(config.telegramUrl % [chan, content.encodeUrl()])
 
@@ -140,12 +143,14 @@ proc onIrcEvent(client: AsyncIrc, event: IrcEvent) {.async.} =
     discard
 
 proc check {.async.} = 
+  let allChans = config.ircChans & config.ircFullChans
+  let allIds = config.telegramIds & config.telegramFullIds
   client = newAsyncIrc(
     address = "irc.freenode.net", 
     port = Port(6667),
     nick = config.ircNickname,
     serverPass = config.ircPassword,
-    joinChans = @[config.ircChan], 
+    joinChans = allChans, 
     callback = onIrcEvent
   )
   await client.connect()
@@ -179,32 +184,37 @@ proc check {.async.} =
     let postAuthor = newPost.author.capitalizeAscii()
     let postContext = newPost.startContext
     
+    # We already know about that post (or thread)
+    if lastPost.id == newPost.id: continue
     # We still need to update, because we might've read new thread id
     # from the file and all other fields are empty
-    if lastThread.id == newThread.id:
-      lastThread = newThread
+    #if lastThread.id == newThread.id:
+    #  lastThread = newThread
     
     # Only 1 post -> new thread
-    elif newThread.posts.len == 1:
+    if newThread.posts.len == 1:
       lastThread = newThread
       let content = &"New thread by {threadAuthor}: {threadTitle}, see {threadLink}"
       for webhook in [config.discordWebhook]:
         asyncCheck webhook.postToDiscord content
-      asyncCheck postToTelegram content
-      asyncCheck client.privmsg(config.ircChan, content)
-      writeFile("last_thread", $lastThread.id)
-    
-    # We have a "new" thread with more than 1 post
+      for chan in allIds:
+        asyncCheck chan.postToTelegram content
+      for chan in allChans:
+        asyncCheck client.privmsg(chan, content)
+      
+      #writeFile("last_thread", $lastThread.id)
+    # More than 1 post -> new post
     else:
-      # If we already know about the last post - ignore
-      if lastPost.id == newPost.id: continue
-
       lastPost = newPost
       let content = &"New post by {postAuthor} in {threadTitle}: {postContext} ({postLink})"
       for webhook in [config.discordWebhook]:
         asyncCheck webhook.postToDiscord content
-      asyncCheck postToTelegram content
-      asyncCheck client.privmsg(config.ircChan, content)
+      for chan in config.telegramFullIds:
+        asyncCheck chan.postToTelegram(content)
+      for chan in config.ircFullChans:
+        asyncCheck client.privmsg(chan, content)
+      
+      writeFile("last_post", $lastPost.id)
 
 proc main = 
   config = parseFile("config.json").to(Config)
@@ -212,8 +222,11 @@ proc main =
   if "last_activity".fileExists():
     lastActivity = parseInt(readFile("last_activity")).fromUnix()
   
-  if "last_thread".fileExists():
-    lastThread.id = parseInt(readFile("last_thread"))
+  #if "last_thread".fileExists():
+  #  lastThread.id = parseInt(readFile("last_thread"))
+  
+  if "last_post".fileExists():
+    lastPost.id = parseInt(readFile("last_post"))
 
   waitFor check()
 

@@ -4,9 +4,12 @@
   "posts_url": "https://forum.nim-lang.org/posts.json?id=",
   "max_context_len": 60,
   "check_interval": 20,
-  "irc_nickname": "ForumUpdaterBot",
-  "irc_password": "XXXXXXXXX",
-  "irc_chan": "#nim",
-  "discord_webhook": "XXXXXXXXXXX",
-  "telegram_url": "XXXXXXXXX"
+  "irc_nickname": "XXXXXXXXX",
+  "irc_password": "XXXXXXXX",
+  "irc_chans": ["#nim"],
+  "irc_full_chans": ["#nim-news"],
+  "discord_webhook": "XXXXXXXXXXXXXXX",
+  "telegram_url": "https://api.telegram.org/XXXXXXXXXXXX/sendMessage?chat_id=$1&text=$2",
+  "telegram_ids": ["@nim_lang"],
+  "telegram_full_ids": ["@nimforum_updates"]
 }
