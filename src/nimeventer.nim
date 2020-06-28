@@ -130,10 +130,11 @@ proc getLastThread(): Future[Option[ForumThread]] {.async.} =
   result = some thread
 
 var 
-  lastThread: ForumThread
-  lastPost: Post
-  lastActivity: Time
-  client: AsyncIrc
+  lastPostId: int # ID of the last post we handled
+  lastActivity: Time # timestamp of the last "activity" we handled
+  client: AsyncIrc # IRC client instance
+  allChans: seq[string] # IRC channels to send all updates to
+  allTelegramIds: seq[string] # Telegram channels to send all updates to
 
 proc onIrcEvent(client: AsyncIrc, event: IrcEvent) {.async.} =
   case event.typ
@@ -142,9 +143,60 @@ proc onIrcEvent(client: AsyncIrc, event: IrcEvent) {.async.} =
   else:
     discard
 
+proc doIter {.async.} = 
+  echo "Checking..."
+  let newThreadMaybe = await getLastThread()
+  # For HTTP errors (forum can sometimes send codes like 502)
+  if not newThreadMaybe.isSome(): 
+    return
+  
+  let newThread = newThreadMaybe.get()
+  let newPost = newThread.posts[^1]
+
+  # Either nothing changed (==) or someone removed the last post
+  # or thread (>), both of which will be caught here. 
+  if lastActivity >= newPost.created:
+    return
+  lastActivity = newPost.created
+
+  # We write the last timestamp so that after restart we don't spam
+  # with the same threads / posts
+  writeFile("last_activity", $lastActivity.toUnix())
+
+  let threadTitle = newThread.title.capitalizeAscii()
+  let threadAuthor = newThread.author.capitalizeAscii()
+  let threadLink = &"{config.baseUrl}t/{newThread.id}"
+  let postLink = &"{config.baseUrl}t/{newThread.id}#{newPost.id}"
+  let postAuthor = newPost.author.capitalizeAscii()
+  let postContext = newPost.startContext
+  
+  # We already know about that post (or thread)
+  if newPost.id == lastPostId: return
+  # Save the ID of the last post and immediately write it to the file
+  lastPostId = newPost.id
+  writeFile("last_post", $lastPostId)
+  
+  template post(content: string, disc, telegram, irc: untyped): untyped = 
+    for webhook in disc:
+      asyncCheck webhook.postToDiscord content
+    for chan in telegram:
+      asyncCheck chan.postToTelegram content
+    for chan in irc:
+      asyncCheck client.privmsg(chan, content)
+    echo content
+  
+  # Only 1 post -> new thread, post everywhere
+  if newThread.posts.len == 1:
+    fmt("New thread by {threadAuthor}: {threadTitle}, see {threadLink}").post(
+      [config.discordWebhook], allTelegramIds, allChans
+    )
+  # More than 1 post -> new post, don't post in some communities
+  else:
+    fmt("New post by {postAuthor} in {threadTitle}: {postContext} ({postLink})").post(
+      [config.discordWebhook], config.telegramFullIds, config.ircFullChans
+    )
+
 proc check {.async.} = 
-  let allChans = config.ircChans & config.ircFullChans
-  let allIds = config.telegramIds & config.telegramFullIds
   client = newAsyncIrc(
     address = "irc.freenode.net", 
     port = Port(6667),
@@ -154,79 +206,25 @@ proc check {.async.} =
     callback = onIrcEvent
   )
   await client.connect()
+
   asyncCheck client.run()
 
-  while true: 
+  while true:
     await sleepAsync(config.checkInterval * 1000)
-    echo "Checking..."
-    let newThreadMaybe = await getLastThread()
-    # For HTTP errors (forum can sometimes send codes like 502)
-    if not newThreadMaybe.isSome(): 
-      continue
-    
-    let newThread = newThreadMaybe.get()
-    let newPost = newThread.posts[^1]
-
-    # Either nothing changed (==) or someone removed the last post
-    # or thread (>), both of which will be caught here. 
-    if lastActivity >= newPost.created:
-      continue
-    lastActivity = newPost.created
-
-    # We write the last timestamp so that after restart we don't spam
-    # with the same threads / posts
-    writeFile("last_activity", $lastActivity.toUnix())
-
-    let threadTitle = newThread.title.capitalizeAscii()
-    let threadAuthor = newThread.author.capitalizeAscii()
-    let threadLink = &"{config.baseUrl}t/{newThread.id}"
-    let postLink = &"{config.baseUrl}t/{newThread.id}#{newPost.id}"
-    let postAuthor = newPost.author.capitalizeAscii()
-    let postContext = newPost.startContext
-    
-    # We already know about that post (or thread)
-    if lastPost.id == newPost.id: continue
-    # We still need to update, because we might've read new thread id
-    # from the file and all other fields are empty
-    #if lastThread.id == newThread.id:
-    #  lastThread = newThread
-    
-    # Only 1 post -> new thread
-    if newThread.posts.len == 1:
-      lastThread = newThread
-      let content = &"New thread by {threadAuthor}: {threadTitle}, see {threadLink}"
-      for webhook in [config.discordWebhook]:
-        asyncCheck webhook.postToDiscord content
-      for chan in allIds:
-        asyncCheck chan.postToTelegram content
-      for chan in allChans:
-        asyncCheck client.privmsg(chan, content)
-      
-      #writeFile("last_thread", $lastThread.id)
-    # More than 1 post -> new post
-    else:
-      lastPost = newPost
-      let content = &"New post by {postAuthor} in {threadTitle}: {postContext} ({postLink})"
-      for webhook in [config.discordWebhook]:
-        asyncCheck webhook.postToDiscord content
-      for chan in config.telegramFullIds:
-        asyncCheck chan.postToTelegram(content)
-      for chan in config.ircFullChans:
-        asyncCheck client.privmsg(chan, content)
-      
-      writeFile("last_post", $lastPost.id)
+    try: await doIter()
+    # For stability and some async errors
+    except: discard
 
 proc main = 
   config = parseFile("config.json").to(Config)
-  # Read some "config" files first :)
+  allChans = config.ircChans & config.ircFullChans
+  allTelegramIds = config.telegramIds & config.telegramFullIds
+  # Some info to not re-post on restart
   if "last_activity".fileExists():
     lastActivity = parseInt(readFile("last_activity")).fromUnix()
   
-  #if "last_thread".fileExists():
-  #  lastThread.id = parseInt(readFile("last_thread"))
-  
   if "last_post".fileExists():
-    lastPost.id = parseInt(readFile("last_post"))
+    lastPostId = parseInt(readFile("last_post"))
 
   waitFor check()
 
