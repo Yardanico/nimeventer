@@ -12,6 +12,7 @@ type
   Post = object
     id: int
     author: string
+    shouldIgnore: bool
     startContext: string
     created: Time
   
@@ -120,9 +121,11 @@ proc getLastThread(): Future[Option[ForumThread]] {.async.} =
     if i == 0:
       thread.author = post["author"]["name"].getStr()
     
+    const badRanks = ["Spammer", "Moderated", "Troll", "Banned"]
     thread.posts.add Post(
       id: post["id"].getInt(),
       author: post["author"]["name"].getStr(),
+      shouldIgnore: post["author"]["rank"].getStr() in badRanks,
       created: post["info"]["creation"].getInt().fromUnix(),
       startContext: getContextForPost(post["info"]["content"].getStr())
     )
@@ -153,9 +156,9 @@ proc doIter {.async.} =
   let newThread = newThreadMaybe.get()
   let newPost = newThread.posts[^1]
 
-  # Either nothing changed (==) or someone removed the last post
-  # or thread (>), both of which will be caught here. 
-  if lastActivity >= newPost.created:
+  # Ignore new posts from banned / moderated / etc users and verify
+  # that the new post was created later than the last post we checked
+  if newPost.shouldIgnore or lastActivity >= newPost.created:
     return
   lastActivity = newPost.created
 
