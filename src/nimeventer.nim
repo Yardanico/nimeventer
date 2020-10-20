@@ -216,7 +216,12 @@ proc check {.async.} =
     await sleepAsync(config.checkInterval * 1000)
     try: await doIter()
     # For stability and some async errors
-    except: discard
+    except: 
+      echo "!!!!!got exception!!!!!"
+      let e = getCurrentException()
+      echo e.getStackTrace()
+      echo e.msg
+      echo "!!!!!!!!!!!!!!!!!!!!!!!"
 
 proc main = 
   config = parseFile("config.json").to(Config)
