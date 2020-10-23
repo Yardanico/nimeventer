@@ -8,6 +8,9 @@ import std / [
 
 import irc
 
+import nimeventerpkg/reddit
+
+
 type
   Post = object
     id: int
@@ -27,6 +30,7 @@ type
     base_url: string
     threads_url: string
     posts_url: string
+    reddit_url: string
     max_context_len: int
     check_interval: int
     irc_nickname: string
@@ -45,7 +49,7 @@ proc postToDiscord(webhook, content: string) {.async.} =
   client.headers = newHttpHeaders({"Content-Type": "application/json"})
   let data = $(
     %*{
-      "username": "ForumUpdater", 
+      "username": "NimEventer", 
       "content": content
     }
   )
@@ -150,6 +154,15 @@ proc onIrcEvent(client: AsyncIrc, event: IrcEvent) {.async.} =
   else:
     discard
 
+template post(content: string, disc, telegram, irc: untyped): untyped = 
+  for webhook in disc:
+    asyncCheck webhook.postToDiscord content
+  for chan in telegram:
+    asyncCheck chan.postToTelegram content
+  for chan in irc:
+    asyncCheck client.privmsg(chan, content)
+  echo content
+
 proc doIter {.async.} = 
   echo "Checking..."
   let newThreadMaybe = await getLastThread()
@@ -168,7 +181,7 @@ proc doIter {.async.} =
 
   # We write the last timestamp so that after restart we don't spam
   # with the same threads / posts
-  writeFile("last_activity", $lastActivity.toUnix())
+  writeFile("last_activity_forum", $lastActivity.toUnix())
 
   let threadTitle = newThread.title.capitalizeAscii()
   let threadAuthor = newThread.author.capitalizeAscii()
@@ -182,15 +195,6 @@ proc doIter {.async.} =
   # Save the ID of the last post and immediately write it to the file
   lastPostId = newPost.id
   writeFile("last_post", $lastPostId)
-  
-  template post(content: string, disc, telegram, irc: untyped): untyped = 
-    for webhook in disc:
-      asyncCheck webhook.postToDiscord content
-    for chan in telegram:
-      asyncCheck chan.postToTelegram content
-    for chan in irc:
-      asyncCheck client.privmsg(chan, content)
-    echo content
   
   # Only 1 post -> new thread, post everywhere
   if newThread.posts.len == 1:
@@ -218,7 +222,14 @@ proc check {.async.} =
 
   while true:
     await sleepAsync(config.checkInterval * 1000)
-    try: await doIter()
+    try: 
+      await doIter()
+      # TODO: refactor stuff so that it's consistent for different platforms
+      # because we might want to add stackoverflow in the future
+      let redditCont = await checkReddit(config.redditUrl)
+      if redditCont != "":
+        redditCont.post([config.discordWebhook], allTelegramIds, allChans)
+
     # For stability and some async errors
     except: 
       echo "!!!!!got exception!!!!!"
@@ -232,8 +243,8 @@ proc main =
   allChans = config.ircChans & config.ircFullChans
   allTelegramIds = config.telegramIds & config.telegramFullIds
   # Some info to not re-post on restart
-  if "last_activity".fileExists():
-    lastActivity = parseInt(readFile("last_activity")).fromUnix()
+  if "last_activity_forum".fileExists():
+    lastActivity = parseInt(readFile("last_activity_forum")).fromUnix()
   
   if "last_post".fileExists():
     lastPostId = parseInt(readFile("last_post"))
