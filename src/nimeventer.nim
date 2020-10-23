@@ -248,6 +248,9 @@ proc main =
   
   if "last_post".fileExists():
     lastPostId = parseInt(readFile("last_post"))
+  
+  if "last_activity_reddit".fileExists():
+    lastActivityReddit = parseInt(readFile("last_activity_reddit"))
 
   waitFor check()
 

@@ -5,7 +5,7 @@ import std / [
 
 #const RedditUrl = "https://www.reddit.com/r/nim/new.json"
 
-var lastActivityReddit: Time
+var lastActivityReddit*: int64
 
 proc checkReddit*(url: string): Future[string] {.async.} = 
   let client = newAsyncHttpClient()
@@ -22,12 +22,12 @@ proc checkReddit*(url: string): Future[string] {.async.} =
   let id = data["id"].getStr()
   let title = data["title"].getStr()
   let author = data["author"].getStr()
-  let created = data["created_utc"].getfloat().fromUnixFloat()
+  let created = data["created_utc"].getFloat().toInt()
   # if the post was created earlier or it's the same one we that posted before
   if created <= lastActivityReddit:
     return
   lastActivityReddit = created
-  writeFile("last_activity_reddit", $lastActivityReddit.toUnix())
+  writeFile("last_activity_reddit", $lastActivityReddit)
   var commentsUrl = data["url"].getStr()
   when false:
     with commentsUrl:
