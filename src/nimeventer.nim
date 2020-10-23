@@ -8,7 +8,7 @@ import std / [
 
 import irc
 
-import nimeventerpkg/reddit
+import nimeventerpkg/[reddit, stackoverflow]
 
 
 type
@@ -229,6 +229,10 @@ proc check {.async.} =
       let redditCont = await checkReddit(config.redditUrl)
       if redditCont != "":
         redditCont.post([config.discordWebhook], allTelegramIds, allChans)
+      
+      let soCont = await checkStackoverflow(config.soTag)
+      if soCont != "":
+        soCont.post([config.discordWebhook], allTelegramIds, allChans)
 
     # For stability and some async errors
     except: 
@@ -251,6 +255,9 @@ proc main =
   
   if "last_activity_reddit".fileExists():
     lastActivityReddit = parseInt(readFile("last_activity_reddit"))
+  
+  if "last_activity_so".fileExists():
+    lastActivitySo = parseInt(readFile("last_activity_so"))
 
   waitFor check()
 

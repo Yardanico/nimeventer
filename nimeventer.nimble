@@ -5,4 +5,4 @@ license       = "MIT"
 srcDir        = "src"
 bin           = @["nimeventer"]
 
-requires "nim >= 1.2.0", "irc"
+requires "nim >= 1.2.0", "irc", "zip"
