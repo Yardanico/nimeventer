@@ -3,6 +3,7 @@
   "threads_url": "https://forum.nim-lang.org/threads.json",
   "posts_url": "https://forum.nim-lang.org/posts.json?id=",
   "reddit_url": "https://www.reddit.com/r/nim/new.json",
+  "so_tag": "nim-lang",
   "max_context_len": 60,
   "check_interval": 20,
   "irc_nickname": "XXXXXXXXX",

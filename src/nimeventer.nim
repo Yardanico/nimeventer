@@ -31,6 +31,7 @@ type
     threads_url: string
     posts_url: string
     reddit_url: string
+    so_tag: string
     max_context_len: int
     check_interval: int
     irc_nickname: string
@@ -257,7 +258,7 @@ proc main =
     lastActivityReddit = parseInt(readFile("last_activity_reddit"))
   
   if "last_activity_so".fileExists():
-    lastActivitySo = parseInt(readFile("last_activity_so"))
+    lastActivityStackoverflow = parseInt(readFile("last_activity_so"))
 
   waitFor check()
 
