@@ -56,6 +56,7 @@ proc postToTelegram(id, content: string) {.async.} =
   let chan = id.encodeUrl()
   let client = newAsyncHttpClient()
   let resp = await client.get(config.telegramUrl % [chan, content.encodeUrl()])
+  client.close()
 
 proc getContextForPost(cont: string): string = 
   let processed = cont.strip().parseHtml()
@@ -98,6 +99,7 @@ proc getLastThread(): Future[Option[ForumThread]] {.async.} =
   var client = newAsyncHttpClient()
   var resp = await client.get(config.threadsUrl)
   if resp.code != Http200: 
+    client.close()
     return
   
   let thrbody = await resp.body
@@ -109,10 +111,12 @@ proc getLastThread(): Future[Option[ForumThread]] {.async.} =
   )
   
   resp = await client.get(config.postsUrl & $thread.id)
-  if resp.code != Http200: 
+  if resp.code != Http200:
+    client.close()
     return
   
   let postsBody = await resp.body
+  client.close()
   
   let posts = postsBody.parseJson()["posts"]
   for i, post in posts.elems:
