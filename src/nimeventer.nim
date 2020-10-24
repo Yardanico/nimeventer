@@ -94,6 +94,8 @@ proc check {.async.} =
   await client.connect()
 
   asyncCheck client.run()
+  # give irc client 10 seconds to init
+  await sleepAsync(10000)
   asyncCheck doForum(config)
   asyncCheck doStackoverflow(config)
   asyncCheck doReddit(config)
