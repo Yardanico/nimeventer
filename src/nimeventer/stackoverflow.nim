@@ -45,7 +45,7 @@ proc doStackoverflow*(c: Config) {.async.} =
     catchErr:
       let soCont = await checkStackoverflow(c)
       if soCont != "":
-        soCont.post([c.discordWebhook], allTelegramIds, allChans)
+        soCont.post([c.discordWebhook], allTelegramIds, allChans, "[Stackoverflow]")
       await sleepAsync(c.checkInterval * 1000)
 
 proc initStackoverflow*() = 

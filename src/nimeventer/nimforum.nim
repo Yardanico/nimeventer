@@ -140,12 +140,12 @@ proc checkNimforum(c: Config) {.async.} =
   # Only 1 post -> new thread, post everywhere
   if newThread.posts.len == 1:
     fmt("New thread by {threadAuthor}: {threadTitle}, see {threadLink}").post(
-      [c.discordWebhook], allTelegramIds, allChans
+      [c.discordWebhook], allTelegramIds, allChans, "[Forum]"
     )
   # More than 1 post -> new post, don't post in some communities
   else:
     fmt("New post by {postAuthor} in {threadTitle}: {postContext} ({postLink})").post(
-      [c.discordWebhook], c.telegramFullIds, c.ircFullChans
+      [c.discordWebhook], c.telegramFullIds, c.ircFullChans, "[Forum]"
     )
 
 proc doForum*(c: Config) {.async.} = 

@@ -33,12 +33,14 @@ var
   allChans*: seq[string] # IRC channels to send all updates to
   allTelegramIds*: seq[string] # Telegram channels to send all updates to
 
-proc postToDiscord(webhook, content: string) {.async.} = 
+proc postToDiscord(webhook, content, service: string) {.async.} = 
   let client = newAsyncHttpClient()
   client.headers = newHttpHeaders({"Content-Type": "application/json"})
+  var username = "NimEventer"
+  if service != "": username.add service
   let data = $(
     %*{
-      "username": "NimEventer", 
+      "username": username, 
       "content": content
     }
   )
@@ -58,9 +60,9 @@ proc onIrcEvent(client: AsyncIrc, event: IrcEvent) {.async.} =
   else:
     discard
 
-proc post*(content: string, disc, telegram, irc: openArray[string]) = 
+proc post*(content: string, disc, telegram, irc: openArray[string], service = "") = 
   for webhook in disc:
-    asyncCheck webhook.postToDiscord content
+    asyncCheck webhook.postToDiscord(content, service)
   for chan in telegram:
     asyncCheck chan.postToTelegram content
   for chan in irc:

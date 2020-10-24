@@ -45,7 +45,7 @@ proc doReddit*(c: Config) {.async.} =
     catchErr:
       let redditCont = await checkReddit(c)
       if redditCont != "":
-        redditCont.post([c.discordWebhook], allTelegramIds, allChans)
+        redditCont.post([c.discordWebhook], allTelegramIds, allChans, "[Reddit]")
       await sleepAsync(c.checkInterval * 1000)
 
 proc initReddit* = 
