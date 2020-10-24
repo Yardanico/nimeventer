@@ -1,16 +1,18 @@
 import std / [
   strutils, httpclient, json, asyncdispatch,
-  times, strformat, with, options
+  times, strformat, with, options, os
 ]
+
+import ../nimeventer
 
 #const RedditUrl = "https://www.reddit.com/r/nim/new.json"
 
 var lastActivityReddit*: int64
 
-proc checkReddit*(url: string): Future[string] {.async.} = 
+proc checkReddit*(c: Config): Future[string] {.async.} = 
   let client = newAsyncHttpClient()
   defer: client.close()
-  let resp = await client.get(url)
+  let resp = await client.get(c.redditUrl)
   if resp.code != Http200:
     return
   let obj = parseJson(await resp.body)
@@ -38,11 +40,18 @@ proc checkReddit*(url: string): Future[string] {.async.} =
     let postData = parseJson(await commResp.body)
   result = fmt"New post on r/nim by {author}: {title}, see {commentsUrl}"
 
+proc doReddit*(c: Config) {.async.} = 
+  while true:
+    catchErr:
+      await sleepAsync(c.checkInterval * 1000)
+      let redditCont = await checkReddit(c)
+      if redditCont != "":
+        redditCont.post([c.discordWebhook], allTelegramIds, allChans)
+
+proc initReddit* = 
+  if "last_activity_reddit".fileExists():
+    lastActivityReddit = parseInt(readFile("last_activity_reddit"))
+
+
 when isMainModule:
-  proc main {.async.} = 
-    while true:
-      let data = await checkReddit("https://www.reddit.com/r/nim/new.json")
-      if data != "":
-        echo data
-      await sleepAsync(1000)
-  waitFor main()
+  waitFor doReddit(Config(redditUrl: "https://www.reddit.com/r/nim/new.json"))
