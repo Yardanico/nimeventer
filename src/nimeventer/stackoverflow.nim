@@ -43,10 +43,10 @@ proc checkStackoverflow*(c: Config): Future[string] {.async.} =
 proc doStackoverflow*(c: Config) {.async.} = 
   while true:
     catchErr:
-      await sleepAsync(c.checkInterval * 1000)
       let soCont = await checkStackoverflow(c)
       if soCont != "":
         soCont.post([c.discordWebhook], allTelegramIds, allChans)
+      await sleepAsync(c.checkInterval * 1000)
 
 proc initStackoverflow*() = 
   if "last_activity_so".fileExists():

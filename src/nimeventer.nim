@@ -77,7 +77,7 @@ template catchErr*(body: untyped) =
     echo e.msg
     echo "!!!!!!!!!!!!!!!!!!!!!!!"
 
-# Import here so these modules can impor this module
+# Nim *can* do recursive imports if you were wondering :)
 import nimeventer/[nimforum, reddit, stackoverflow]
 
 proc check {.async.} = 

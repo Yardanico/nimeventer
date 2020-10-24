@@ -151,8 +151,8 @@ proc checkNimforum(c: Config) {.async.} =
 proc doForum*(c: Config) {.async.} = 
   while true:
     catchErr:
-      await sleepAsync(c.checkInterval * 1000)
       await checkNimforum(c)
+      await sleepAsync(c.checkInterval * 1000)
 
 proc initForum*() = 
   # Some info to not re-post on restart

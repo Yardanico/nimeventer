@@ -43,10 +43,10 @@ proc checkReddit*(c: Config): Future[string] {.async.} =
 proc doReddit*(c: Config) {.async.} = 
   while true:
     catchErr:
-      await sleepAsync(c.checkInterval * 1000)
       let redditCont = await checkReddit(c)
       if redditCont != "":
         redditCont.post([c.discordWebhook], allTelegramIds, allChans)
+      await sleepAsync(c.checkInterval * 1000)
 
 proc initReddit* = 
   if "last_activity_reddit".fileExists():
