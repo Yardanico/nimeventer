@@ -30,14 +30,7 @@ proc checkReddit*(c: Config): Future[string] {.async.} =
     return
   lastActivityReddit = created
   writeFile("last_activity_reddit", $lastActivityReddit)
-  var commentsUrl = data["url"].getStr()
-  when false:
-    with commentsUrl:
-      delete(len(commentsUrl) - 1, 999)
-      add(".json")
-    
-    let commResp = await client.get(commentsUrl)
-    let postData = parseJson(await commResp.body)
+  var commentsUrl = "https://reddit.com" & data["permalink"].getStr()
   result = fmt"New post on r/nim by {author}: {title}, see {commentsUrl}"
 
 proc doReddit*(c: Config) {.async.} = 
