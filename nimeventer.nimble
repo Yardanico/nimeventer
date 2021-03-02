@@ -5,4 +5,7 @@ license       = "MIT"
 srcDir        = "src"
 bin           = @["nimeventer"]
 
-requires "nim >= 1.2.0", "irc", "zip"
+requires "nim >= 1.2.0"
+requires "irc" # post to irc
+requires "zippy" # stackoverflow gzip
+requires "flatty" # serializing last activity states

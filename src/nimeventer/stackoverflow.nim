@@ -1,27 +1,24 @@
-import std / [
+import std/[
   strutils, httpclient, json, asyncdispatch,
-  strformat, with, options, cgi, os
+  strformat, cgi, options, os
 ]
 
-import zip/zlib
+import zippy
 
 import ../nimeventer
 
 const
   SoSearchUrl = "https://api.stackexchange.com/2.2/search?order=desc&sort=creation&site=stackoverflow&tagged=$1&key=$2"
 
-var lastActivityStackoverflow*: int64
-
 proc checkStackoverflow*(c: Config): Future[string] {.async.} = 
   let client = newAsyncHttpClient()
   defer: client.close()
 
-  let resp = await client.get(SoSearchUrl.format(c.soTag, encodeUrl(c.soKey)))
+  let resp = await client.get(SoSearchUrl % [c.soTag, encodeUrl(c.soKey)])
 
-  # StackOverflow ALWAYS compresses the API responses with either GZIP or DEFLATE
-  # By default they claim to use GZIP
-  let cont = uncompress(await resp.body, stream=GZIP_STREAM)
-  let jsObj = parseJson(cont)
+  # Uncompress gzipped response
+  let body = await resp.body
+  let jsObj = parseJson(uncompress(body))
   let lastPost = jsObj["items"][0]
   let title = lastPost["title"].getStr()
   let url = lastPost["link"].getStr()
@@ -31,11 +28,10 @@ proc checkStackoverflow*(c: Config): Future[string] {.async.} =
   if backoff != nil:
     await sleepAsync(backoff.getInt())
 
-  if creationDate <= lastActivityStackoverflow:
+  if creationDate <= parseInt(kdb["soLastActivity"]):
     return
   
-  lastActivityStackoverflow = creationDate
-  writeFile("last_activity_so", $lastActivityStackoverflow)
+  kdb["soLastActivity"] = $creationDate
 
   let author = lastPost["owner"]["display_name"].getStr()
   result = fmt"New question by {author}: {title}, see {url}"
@@ -49,8 +45,8 @@ proc doStackoverflow*(c: Config) {.async.} =
       await sleepAsync(c.checkInterval * 1000)
 
 proc initStackoverflow*() = 
-  if "last_activity_so".fileExists():
-    lastActivityStackoverflow = parseInt(readFile("last_activity_so"))
+  if "soLastActivity" notin kdb:
+    kdb["soLastActivity"] = "0"
 
 when isMainModule:
   echo waitFor checkStackoverflow(Config(soTag: "nim-lang"))

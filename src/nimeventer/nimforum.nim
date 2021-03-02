@@ -1,9 +1,8 @@
-import std / [
+import std/[
   httpclient, asyncdispatch, strformat,
-  times, htmlparser, strutils, xmltree,
+  htmlparser, strutils, xmltree,
   options, json, os
 ]
-
 
 import ../nimeventer
 
@@ -13,18 +12,14 @@ type
     author: string
     shouldIgnore: bool
     startContext: string
-    created: Time
+    created: int64
   
   ForumThread = object
     id: int
-    activity: Time
+    activity: int64
     author: string
     title: string
     posts: seq[Post]
-
-var
-  lastPostId: int # ID of the last post we handled
-  lastActivity: Time # timestamp of the last "activity" we handled
 
 proc getContextForPost(c: Config, cont: string): string = 
   let processed = cont.strip().parseHtml()
@@ -65,7 +60,7 @@ proc getContextForPost(c: Config, cont: string): string =
 
 proc getLastThread(c: Config): Future[Option[ForumThread]] {.async.} = 
   var client = newAsyncHttpClient()
-  var resp = await client.get(c.threadsUrl)
+  var resp = await client.get(c.baseUrl & "threads.json")
   if resp.code != Http200: 
     client.close()
     return
@@ -74,11 +69,11 @@ proc getLastThread(c: Config): Future[Option[ForumThread]] {.async.} =
   let lastThr = thrbody.parseJson()["threads"][0]
   var thread = ForumThread(
     id: lastThr["id"].getInt(),
-    activity: lastThr["activity"].getInt().fromUnix(),
+    activity: lastThr["activity"].getInt(),
     title: lastThr["topic"].getStr()
   )
   
-  resp = await client.get(c.postsUrl & $thread.id)
+  resp = await client.get(c.baseUrl & fmt"posts.json?id={thread.id}")
   if resp.code != Http200:
     client.close()
     return
@@ -98,7 +93,7 @@ proc getLastThread(c: Config): Future[Option[ForumThread]] {.async.} =
       id: post["id"].getInt(),
       author: post["author"]["name"].getStr(),
       shouldIgnore: post["author"]["rank"].getStr() in badRanks,
-      created: post["info"]["creation"].getInt().fromUnix(),
+      created: post["info"]["creation"].getInt(),
       startContext: getContextForPost(c, post["info"]["content"].getStr())
     )
   
@@ -116,13 +111,11 @@ proc checkNimforum(c: Config) {.async.} =
 
   # Ignore new posts from banned / moderated / etc users and verify
   # that the new post was created later than the last post we checked
-  if newPost.shouldIgnore or lastActivity >= newPost.created:
+  if newPost.shouldIgnore or parseInt(kdb["forumLastActivity"]) >= newPost.created:
     return
-  lastActivity = newPost.created
-
   # We write the last timestamp so that after restart we don't spam
   # with the same threads / posts
-  writeFile("last_activity_forum", $lastActivity.toUnix())
+  kdb["forumLastActivity"] = $newPost.created
 
   let threadTitle = newThread.title.capitalizeAscii()
   let threadAuthor = newThread.author.capitalizeAscii()
@@ -132,10 +125,9 @@ proc checkNimforum(c: Config) {.async.} =
   let postContext = newPost.startContext
   
   # We already know about that post (or thread)
-  if newPost.id == lastPostId: return
+  if newPost.id == parseInt(kdb["forumLastPost"]): return
   # Save the ID of the last post and immediately write it to the file
-  lastPostId = newPost.id
-  writeFile("last_post", $lastPostId)
+  kdb["forumLastPost"] = $newPost.id
   
   # Only 1 post -> new thread, post everywhere
   if newThread.posts.len == 1:
@@ -156,8 +148,8 @@ proc doForum*(c: Config) {.async.} =
 
 proc initForum*() = 
   # Some info to not re-post on restart
-  if "last_activity_forum".fileExists():
-    lastActivity = parseInt(readFile("last_activity_forum")).fromUnix()
+  if "forumLastActivity" notin kdb:
+    kdb["forumLastActivity"] = "0"
   
-  if "last_post".fileExists():
-    lastPostId = parseInt(readFile("last_post"))
+  if "forumLastPost" notin kdb:
+    kdb["forumLastActivity"] = "0"

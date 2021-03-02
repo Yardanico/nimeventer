@@ -1,18 +1,18 @@
-import std / [
-  os, asyncdispatch,
-  times, uri,
-  strformat, strutils, options,
-  json, htmlparser, xmltree, 
-  httpclient
+import std/[
+  asyncdispatch, uri,
+  strutils, options,
+  json, httpclient
 ]
 
 import irc
 
+import nimeventer/simplekv
+export simplekv
+
 type
   Config* = object
+    save_file*: string
     base_url*: string
-    threads_url*: string
-    posts_url*: string
     reddit_url*: string
     so_tag*: string
     so_key*: string
@@ -32,6 +32,7 @@ var
   client: AsyncIrc # IRC client instance
   allChans*: seq[string] # IRC channels to send all updates to
   allTelegramIds*: seq[string] # Telegram channels to send all updates to
+  kdb*: SimpleKv
 
 proc postToDiscord(webhook, content, service: string) {.async.} = 
   let client = newAsyncHttpClient()
@@ -79,7 +80,6 @@ template catchErr*(body: untyped) =
     echo e.msg
     echo "!!!!!!!!!!!!!!!!!!!!!!!"
 
-# Nim *can* do recursive imports if you were wondering :)
 import nimeventer/[nimforum, reddit, stackoverflow]
 
 proc check {.async.} = 
@@ -102,8 +102,10 @@ proc check {.async.} =
 
 proc main = 
   config = parseFile("config.json").to(Config)
+  kdb = newSimpleKv(config.saveFile)
   allChans = config.ircChans & config.ircFullChans
   allTelegramIds = config.telegramIds & config.telegramFullIds
+  
   initForum()
   initStackoverflow()
   initReddit()
