@@ -152,4 +152,4 @@ proc initForum*() =
     kdb["forumLastActivity"] = "0"
   
   if "forumLastPost" notin kdb:
-    kdb["forumLastActivity"] = "0"
+    kdb["forumLastPost"] = "0"
