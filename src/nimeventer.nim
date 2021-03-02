@@ -80,7 +80,7 @@ template catchErr*(body: untyped) =
     echo e.msg
     echo "!!!!!!!!!!!!!!!!!!!!!!!"
 
-import nimeventer/[nimforum, reddit, stackoverflow]
+import nimeventer/[nimforum, reddit, stackoverflow, packages]
 
 proc check {.async.} = 
   client = newAsyncIrc(
@@ -99,6 +99,7 @@ proc check {.async.} =
   asyncCheck doForum(config)
   asyncCheck doStackoverflow(config)
   asyncCheck doReddit(config)
+  asyncCheck doPackages(config)
 
 proc main = 
   config = parseFile("config.json").to(Config)
@@ -109,6 +110,7 @@ proc main =
   initForum()
   initStackoverflow()
   initReddit()
+  initPackages()
 
   asyncCheck check()
   runForever()
