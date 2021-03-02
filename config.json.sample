@@ -1,7 +1,6 @@
 {
+  "save_file": "activityData.flatty",
   "base_url": "https://forum.nim-lang.org/",
-  "threads_url": "https://forum.nim-lang.org/threads.json",
-  "posts_url": "https://forum.nim-lang.org/posts.json?id=",
   "reddit_url": "https://www.reddit.com/r/nim/new.json",
   "so_tag": "nim-lang",
   "so_key": "XXXXXXXXXX",
