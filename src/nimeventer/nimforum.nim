@@ -118,10 +118,10 @@ proc checkNimforum(c: Config) {.async.} =
   kdb["forumLastActivity"] = $newPost.created
 
   let threadTitle = newThread.title.capitalizeAscii()
-  let threadAuthor = newThread.author.capitalizeAscii()
+  let threadAuthor = newThread.author
   let threadLink = fmt"{c.baseUrl}t/{newThread.id}"
   let postLink = fmt"{c.baseUrl}t/{newThread.id}#{newPost.id}"
-  let postAuthor = newPost.author.capitalizeAscii()
+  let postAuthor = newPost.author
   let postContext = newPost.startContext
   
   # We already know about that post (or thread)
