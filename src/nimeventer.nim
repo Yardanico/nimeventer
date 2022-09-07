@@ -84,7 +84,7 @@ import nimeventer/[nimforum, reddit, stackoverflow, packages]
 
 proc check {.async.} = 
   client = newAsyncIrc(
-    address = "irc.freenode.net", 
+    address = "irc.libera.chat", 
     port = Port(6667),
     nick = config.ircNickname,
     serverPass = config.ircPassword,
