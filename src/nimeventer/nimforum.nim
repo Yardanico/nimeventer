@@ -65,8 +65,20 @@ proc getLastThread(c: Config): Future[Option[ForumThread]] {.async.} =
     client.close()
     return
   
-  let thrbody = await resp.body
-  let lastThr = thrbody.parseJson()["threads"][0]
+  let thrbody = parseJson(await resp.body)
+  # We do this to skip pinned threads since it's assumed they get enough
+  # activity anyway, and there's no easy way to make new posts for pinned threads
+  # work without reworking how we store posted events (so it's a TODO)
+  var lastThr: JsonNode
+  for thread in thrbody["threads"]:
+    if not thread["isPinned"].getBool():
+      lastThr = thread
+      break
+  
+  # just in case
+  if lastThr.len == 0:
+    echo "what? no non-pinned threads?"
+    return
   var thread = ForumThread(
     id: lastThr["id"].getInt(),
     activity: lastThr["activity"].getInt(),
